@@ -32,6 +32,16 @@ bool _isFoodWatcherTickRunning = false;
 int? _lastAutoShownFoodOrderId;
 const String _shownFoodOrderIdsKey = 'shownFoodOrderDialogIds';
 
+bool _isNotificationForDriverApp(Map<String, dynamic> data) {
+  final targetApp = data['target_app']?.toString().toLowerCase().trim();
+  if (targetApp != null && targetApp.isNotEmpty && targetApp != 'driver') {
+    return false;
+  }
+
+  final route = data['route']?.toString();
+  return route != 'restaurant_food_order';
+}
+
 Future<void> setupFlutterNotifications() async {
   if (isFlutterLocalNotificationsInitialized) {
     return;
@@ -57,6 +67,10 @@ Future<void> setupFlutterNotifications() async {
 }
 
 void showFlutterNotificationfromFirebase(RemoteMessage message) async {
+  if (!_isNotificationForDriverApp(message.data)) {
+    return;
+  }
+
   RemoteNotification? notification = message.notification;
   AndroidNotification? android = message.notification?.android;
   if (notification != null && android != null && !kIsWeb) {
@@ -190,6 +204,10 @@ Future<void> _attachNotificationListeners() async {
 
   FirebaseMessaging.onMessage.listen((RemoteMessage event) async {
     showFlutterNotificationfromFirebase(event);
+    if (!_isNotificationForDriverApp(event.data)) {
+      return;
+    }
+
     final route = event.data['route']?.toString();
     if (route == 'food_order') {
       handleNotificationClick(route, event.data);
@@ -200,11 +218,14 @@ Future<void> _attachNotificationListeners() async {
 
   final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   if (initialMessage != null) {
-    handleNotificationClick(initialMessage.data['route'], initialMessage.data);
+    if (_isNotificationForDriverApp(initialMessage.data)) {
+      handleNotificationClick(
+          initialMessage.data['route'], initialMessage.data);
+    }
   }
 
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage event) {
-    if (event.data.isNotEmpty) {
+    if (event.data.isNotEmpty && _isNotificationForDriverApp(event.data)) {
       handleNotificationClick(event.data['route'], event.data);
     }
   });
@@ -220,7 +241,8 @@ void _startFoodRequestWatcher() {
   if (_foodRequestWatcherTimer != null) {
     return;
   }
-  _foodRequestWatcherTimer = Timer.periodic(const Duration(seconds: 8), (_) async {
+  _foodRequestWatcherTimer =
+      Timer.periodic(const Duration(seconds: 8), (_) async {
     await _checkAndShowIncomingFoodRequestFromApi();
   });
 }
@@ -236,7 +258,7 @@ Future<void> _checkAndShowIncomingFoodRequestFromApi() async {
 
   _isFoodWatcherTickRunning = true;
   try {
-    final response = await FoodDeliveryRepository().getAvailableOrders(limit: 20);
+    final response = await FoodDeliveryRepository().getAvailableOrders();
     if (response['status'] != 200) {
       // ignore: avoid_print
       print('[FoodDriver] watcher available orders failed response=$response');
@@ -245,7 +267,8 @@ Future<void> _checkAndShowIncomingFoodRequestFromApi() async {
     final raw = response['data'];
     if (raw is! List || raw.isEmpty) {
       // ignore: avoid_print
-      print('[FoodDriver] watcher no available food order rawType=${raw.runtimeType}');
+      print(
+          '[FoodDriver] watcher no available food order rawType=${raw.runtimeType}');
       return;
     }
 
@@ -257,15 +280,23 @@ Future<void> _checkAndShowIncomingFoodRequestFromApi() async {
       final driverId = (candidate['driver_id'] ?? '').toString();
       final orderId = int.tryParse((candidate['id'] ?? '').toString());
       final isIncoming =
-          status == 'placed' && (driverId.isEmpty || driverId == 'null');
+          status == 'accepted' && (driverId.isEmpty || driverId == 'null');
       if (isIncoming && orderId != null && orderId > 0) {
         order = candidate;
         break;
       }
     }
     if (order == null) {
+      final summaries = raw.whereType<Map>().map((candidate) {
+        final id = (candidate['id'] ?? '').toString();
+        final number = (candidate['order_number'] ?? '').toString();
+        final status = (candidate['status'] ?? '').toString();
+        final driverId = (candidate['driver_id'] ?? '').toString();
+        return '$id:$number:$status:driver=$driverId';
+      }).join(',');
       // ignore: avoid_print
-      print('[FoodDriver] watcher orders found but no incoming placed order count=${raw.length}');
+      print(
+          '[FoodDriver] watcher orders found but no incoming accepted order count=${raw.length} orders=$summaries');
       return;
     }
 
@@ -320,14 +351,24 @@ void _handleIncomingFoodOrder(dynamic data) {
   final orderId = int.tryParse((data?['food_order_id'] ?? '').toString());
   final orderNo = (data?['food_order_number'] ?? '').toString();
   final status = (data?['food_order_status'] ?? '').toString();
-  final payload = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-  final branch = payload['branch'] is Map ? Map<String, dynamic>.from(payload['branch']) : <String, dynamic>{};
-  final restaurant = payload['restaurant'] is Map ? Map<String, dynamic>.from(payload['restaurant']) : <String, dynamic>{};
+  final payload =
+      data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  final branch = payload['branch'] is Map
+      ? Map<String, dynamic>.from(payload['branch'])
+      : <String, dynamic>{};
+  final restaurant = payload['restaurant'] is Map
+      ? Map<String, dynamic>.from(payload['restaurant'])
+      : <String, dynamic>{};
   final pickupAddress = (branch['address'] ?? '').toString();
   final restaurantName = (restaurant['name'] ?? '').toString();
   final totalAmount = (payload['total_amount'] ?? '').toString();
 
-  if (orderId != null && status == 'placed') {
+  final driverId = (payload['driver_id'] ?? '').toString();
+  final isAssignedToDriver = driverId.isNotEmpty && driverId != 'null';
+  final isIncomingAvailableOrder =
+      orderId != null && status == 'accepted' && !isAssignedToDriver;
+
+  if (orderId != null && isIncomingAvailableOrder) {
     if (_hasShownFoodOrderDialog(orderId)) {
       return;
     }
@@ -335,6 +376,7 @@ void _handleIncomingFoodOrder(dynamic data) {
   }
 
   if (orderId != null &&
+      isAssignedToDriver &&
       ['accepted', 'preparing', 'ready_for_pickup', 'picked_up', 'on_the_way']
           .contains(status)) {
     goTo(FoodActiveDeliveryScreen(orderId: orderId));
@@ -381,7 +423,8 @@ void _handleIncomingFoodOrder(dynamic data) {
                 Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(28)),
                   ),
                   width: double.infinity,
                   child: Column(
@@ -408,7 +451,10 @@ void _handleIncomingFoodOrder(dynamic data) {
                       const SizedBox(height: 10),
                       const Text(
                         'seconds left',
-                        style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),
                     ],
@@ -429,16 +475,20 @@ void _handleIncomingFoodOrder(dynamic data) {
                               const Expanded(
                                 child: Text(
                                   'New Food Delivery Request',
-                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700),
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: Colors.orange.withValues(alpha: .12),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: const Icon(Icons.delivery_dining, color: Colors.orange),
+                                child: const Icon(Icons.delivery_dining,
+                                    color: Colors.orange),
                               ),
                             ],
                           ),
@@ -456,13 +506,17 @@ void _handleIncomingFoodOrder(dynamic data) {
                           _foodInfoRow(
                             icon: Icons.confirmation_number_outlined,
                             title: 'Order',
-                            value: orderNo.isEmpty ? 'Food order request' : orderNo,
+                            value: orderNo.isEmpty
+                                ? 'Food order request'
+                                : orderNo,
                           ),
                           const SizedBox(height: 10),
                           _foodInfoRow(
                             icon: Icons.my_location_outlined,
                             title: 'Pickup',
-                            value: pickupAddress.isEmpty ? 'Restaurant pickup location' : pickupAddress,
+                            value: pickupAddress.isEmpty
+                                ? 'Restaurant pickup location'
+                                : pickupAddress,
                           ),
                           const SizedBox(height: 10),
                           if (totalAmount.isNotEmpty) ...[
@@ -496,10 +550,13 @@ void _handleIncomingFoodOrder(dynamic data) {
                                     Navigator.of(sheetCtx).pop();
                                     if (orderId != null && orderId > 0) {
                                       try {
-                                        await ctx.read<DriverFoodCubit>().acceptOrder(orderId);
+                                        await ctx
+                                            .read<DriverFoodCubit>()
+                                            .acceptOrder(orderId);
                                       } catch (_) {}
                                       if (ctx.mounted) {
-                                        goTo(FoodActiveDeliveryScreen(orderId: orderId));
+                                        goTo(FoodActiveDeliveryScreen(
+                                            orderId: orderId));
                                         return;
                                       }
                                     }
@@ -514,7 +571,8 @@ void _handleIncomingFoodOrder(dynamic data) {
                                   onTap: () async {
                                     if (orderId != null && orderId > 0) {
                                       try {
-                                        await FoodDeliveryRepository().rejectOrderOffer(orderId);
+                                        await FoodDeliveryRepository()
+                                            .rejectOrderOffer(orderId);
                                       } catch (_) {}
                                     }
                                     if (!sheetCtx.mounted) return;
@@ -529,7 +587,9 @@ void _handleIncomingFoodOrder(dynamic data) {
                                     ),
                                     child: const Text(
                                       "Skip",
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                   ),
                                 ),
@@ -585,8 +645,7 @@ Set<int> _shownFoodOrderDialogIds() {
 void _rememberShownFoodOrderDialog(int orderId) {
   _lastAutoShownFoodOrderId = orderId;
   final ids = _shownFoodOrderDialogIds()..add(orderId);
-  final trimmed = ids.toList()
-    ..sort((a, b) => b.compareTo(a));
+  final trimmed = ids.toList()..sort((a, b) => b.compareTo(a));
   box.put(_shownFoodOrderIdsKey, jsonEncode(trimmed.take(80).toList()));
 }
 

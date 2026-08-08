@@ -53,7 +53,8 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
         title: Text('Food Orders'.translate(context)),
         actions: [
           IconButton(
-            onPressed: () => context.read<DriverFoodCubit>().loadAvailableOrders(),
+            onPressed: () =>
+                context.read<DriverFoodCubit>().loadAvailableOrders(),
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -61,18 +62,21 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
       body: BlocConsumer<DriverFoodCubit, DriverFoodState>(
         listener: (context, state) {
           if (state is DriverFoodFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(state.message)));
           }
           if (state is DriverFoodActionSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
-            final acceptedId = int.tryParse((state.order['id'] ?? '').toString());
-            if (_acceptingOrderId != null &&
-                acceptedId == _acceptingOrderId) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(state.message)));
+            final acceptedId =
+                int.tryParse((state.order['id'] ?? '').toString());
+            if (_acceptingOrderId != null && acceptedId == _acceptingOrderId) {
               _acceptingOrderId = null;
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => FoodActiveDeliveryScreen(orderId: acceptedId!),
+                  builder: (_) =>
+                      FoodActiveDeliveryScreen(orderId: acceptedId!),
                 ),
               );
               return;
@@ -88,7 +92,8 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
           if (state is DriverFoodAvailableLoaded) {
             if (state.orders.isEmpty) {
               return Center(
-                child: Text('No available food order'.translate(context), style: regular(context)),
+                child: Text('No available food order'.translate(context),
+                    style: regular(context)),
               );
             }
 
@@ -111,7 +116,9 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
                 final hasDriver = o['driver_id'] != null;
                 final next = _nextStatus(status);
                 final isWaitingForRestaurant = hasDriver &&
-                    (status == 'placed' || status == 'accepted' || status == 'preparing');
+                    (status == 'placed' ||
+                        status == 'accepted' ||
+                        status == 'preparing');
 
                 return Container(
                   padding: const EdgeInsets.all(12),
@@ -132,7 +139,9 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(orderNo, style: headingBlack(context).copyWith(fontSize: 14)),
+                          Text(orderNo,
+                              style:
+                                  headingBlack(context).copyWith(fontSize: 14)),
                           Text('Status: $status', style: regular(context)),
                         ],
                       ),
@@ -147,18 +156,25 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
                       const SizedBox(height: 8),
                       _DriverEarningBanner(amount: commission),
                       const SizedBox(height: 6),
-                      Text(address, style: regular(context), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text(address,
+                          style: regular(context),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          if (!hasDriver && (status == 'placed' || status == 'ready_for_pickup'))
+                          if (!hasDriver &&
+                              (status == 'accepted' ||
+                                  status == 'ready_for_pickup'))
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: orderId == 0
                                     ? null
                                     : () {
                                         _acceptingOrderId = orderId;
-                                        context.read<DriverFoodCubit>().acceptOrder(orderId);
+                                        context
+                                            .read<DriverFoodCubit>()
+                                            .acceptOrder(orderId);
                                       },
                                 child: Text('Accept'.translate(context)),
                               ),
@@ -168,7 +184,9 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
                               child: ElevatedButton(
                                 onPressed: orderId == 0
                                     ? null
-                                    : () => context.read<DriverFoodCubit>().updateStatus(
+                                    : () => context
+                                        .read<DriverFoodCubit>()
+                                        .updateStatus(
                                           orderId: orderId,
                                           status: next,
                                         ),
@@ -178,7 +196,8 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
                           if (isWaitingForRestaurant)
                             Expanded(
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
                                 decoration: BoxDecoration(
                                   color: Colors.orange.withValues(alpha: .12),
                                   borderRadius: BorderRadius.circular(8),
@@ -197,7 +216,9 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
                           OutlinedButton(
                             onPressed: orderId == 0
                                 ? null
-                                : () => context.read<DriverFoodCubit>().loadTimeline(orderId),
+                                : () => context
+                                    .read<DriverFoodCubit>()
+                                    .loadTimeline(orderId),
                             child: Text('Timeline'.translate(context)),
                           ),
                         ],
@@ -217,7 +238,8 @@ class _FoodDriverOrdersScreenState extends State<FoodDriverOrdersScreen> {
               itemBuilder: (_, i) {
                 final t = state.timeline[i];
                 return ListTile(
-                  title: Text('${t['from_status'] ?? 'start'} -> ${t['to_status'] ?? ''}'),
+                  title: Text(
+                      '${t['from_status'] ?? 'start'} -> ${t['to_status'] ?? ''}'),
                   subtitle: Text((t['created_at'] ?? '').toString()),
                 );
               },
@@ -262,19 +284,22 @@ class _DriverPaymentBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(isPaid ? Icons.verified_rounded : Icons.schedule_rounded, color: color, size: 23),
+          Icon(isPaid ? Icons.verified_rounded : Icons.schedule_rounded,
+              color: color, size: 23),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
               isPaid
                   ? 'PAID • DO NOT COLLECT CASH${methodLabel.isEmpty ? '' : ' • $methodLabel'}'
                   : 'PAYMENT PENDING${methodLabel.isEmpty ? '' : ' • $methodLabel'}',
-              style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                  color: color, fontSize: 11, fontWeight: FontWeight.w900),
             ),
           ),
           Text(
             amount,
-            style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w900),
+            style: TextStyle(
+                color: color, fontSize: 14, fontWeight: FontWeight.w900),
           ),
         ],
       ),

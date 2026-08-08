@@ -40,17 +40,21 @@ class DriverFoodCubit extends Cubit<DriverFoodState> {
 
   DriverFoodCubit(this.repository) : super(DriverFoodInitial());
 
-  Future<void> loadAvailableOrders({int limit = 20}) async {
+  Future<void> loadAvailableOrders() async {
     emit(DriverFoodLoading());
     try {
-      final response = await repository.getAvailableOrders(limit: limit);
+      final response = await repository.getAvailableOrders();
       if (response['status'] == 200) {
         final List raw = (response['data'] as List?) ?? [];
-        final data = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        final data = raw
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
         emit(DriverFoodAvailableLoaded(data));
         return;
       }
-      emit(DriverFoodFailure((response['message'] ?? 'Failed to load food orders').toString()));
+      emit(DriverFoodFailure(
+          (response['message'] ?? 'Failed to load food orders').toString()));
     } catch (e) {
       emit(DriverFoodFailure(e.toString()));
     }
@@ -67,7 +71,8 @@ class DriverFoodCubit extends Cubit<DriverFoodState> {
         ));
         return;
       }
-      emit(DriverFoodFailure((response['message'] ?? 'Failed to accept order').toString()));
+      emit(DriverFoodFailure(
+          (response['message'] ?? 'Failed to accept order').toString()));
     } catch (e) {
       emit(DriverFoodFailure(e.toString()));
     }
@@ -92,7 +97,8 @@ class DriverFoodCubit extends Cubit<DriverFoodState> {
         ));
         return;
       }
-      emit(DriverFoodFailure((response['message'] ?? 'Failed to update status').toString()));
+      emit(DriverFoodFailure(
+          (response['message'] ?? 'Failed to update status').toString()));
     } catch (e) {
       emit(DriverFoodFailure(e.toString()));
     }
@@ -104,14 +110,17 @@ class DriverFoodCubit extends Cubit<DriverFoodState> {
       final response = await repository.orderTimeline(orderId);
       if (response['status'] == 200) {
         final List raw = (response['data'] as List?) ?? [];
-        final data = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        final data = raw
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
         emit(DriverFoodTimelineLoaded(data));
         return;
       }
-      emit(DriverFoodFailure((response['message'] ?? 'Failed to load timeline').toString()));
+      emit(DriverFoodFailure(
+          (response['message'] ?? 'Failed to load timeline').toString()));
     } catch (e) {
       emit(DriverFoodFailure(e.toString()));
     }
   }
 }
-

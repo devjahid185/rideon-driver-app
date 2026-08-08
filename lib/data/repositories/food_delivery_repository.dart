@@ -3,29 +3,26 @@ import 'package:ride_on_driver/core/services/config.dart';
 import 'package:ride_on_driver/core/services/http.dart';
 
 class FoodDeliveryRepository {
-  Future<Map<String, dynamic>> getAvailableOrders({int limit = 20}) async {
+  Future<Map<String, dynamic>> getAvailableOrders() async {
     // Keep this visible in debug logs because food dispatch depends on polling.
     // ignore: avoid_print
-    print('[FoodDriver] available orders request limit=$limit');
+    print('[FoodDriver] available orders request');
     final response = await httpGet(
       Config.foodAvailableOrders,
-      {'limit': limit.toString()},
+      {},
       context: navigatorKey.currentContext!,
     );
     final mapped = Map<String, dynamic>.from(response ?? {});
     final data = mapped['data'];
     final count = data is List ? data.length : 'n/a';
     // ignore: avoid_print
-    print('[FoodDriver] available orders response status=${mapped['status']} message=${mapped['message']} count=$count');
+    print(
+        '[FoodDriver] available orders response status=${mapped['status']} message=${mapped['message']} count=$count');
     return mapped;
   }
 
-  Future<Map<String, dynamic>> getMyOrders({
-    int limit = 100,
-    String? status,
-  }) async {
+  Future<Map<String, dynamic>> getMyOrders({String? status}) async {
     final query = <String, String>{
-      'limit': limit.toString(),
       if (status != null && status.isNotEmpty) 'status': status,
     };
     final response = await httpGet(
@@ -72,7 +69,8 @@ class FoodDeliveryRepository {
     final payload = <String, dynamic>{
       'status': status,
       if (note != null && note.isNotEmpty) 'note': note,
-      if (deliveryOtp != null && deliveryOtp.isNotEmpty) 'delivery_otp': deliveryOtp,
+      if (deliveryOtp != null && deliveryOtp.isNotEmpty)
+        'delivery_otp': deliveryOtp,
     };
     final response = await httpPost(
       '${Config.foodUpdateOrderStatus}/$orderId/status',

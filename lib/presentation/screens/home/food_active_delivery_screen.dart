@@ -19,12 +19,14 @@ class FoodActiveDeliveryScreen extends StatefulWidget {
   const FoodActiveDeliveryScreen({super.key, required this.orderId});
 
   @override
-  State<FoodActiveDeliveryScreen> createState() => _FoodActiveDeliveryScreenState();
+  State<FoodActiveDeliveryScreen> createState() =>
+      _FoodActiveDeliveryScreenState();
 }
 
 class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
   final FoodDeliveryRepository _repository = FoodDeliveryRepository();
-  final Completer<GoogleMapController> _mapController = Completer<GoogleMapController>();
+  final Completer<GoogleMapController> _mapController =
+      Completer<GoogleMapController>();
   late final MarkerCubit _markerCubit;
   late final GetPolylineCubit _polylineCubit;
   late final RideLocationCubit _rideLocationCubit;
@@ -49,7 +51,8 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
     _rideLocationCubit.startLiveLocationTracking();
     _resolveInitialLocation();
     _load();
-    _timer = Timer.periodic(const Duration(seconds: 6), (_) => _load(silent: true));
+    _timer =
+        Timer.periodic(const Duration(seconds: 6), (_) => _load(silent: true));
   }
 
   @override
@@ -62,7 +65,9 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
     _markerCubit.removeMarker();
     _polylineCubit.resetPolylines();
     if (_mapReady) {
-      _mapController.future.then((controller) => controller.dispose()).catchError((_) {});
+      _mapController.future
+          .then((controller) => controller.dispose())
+          .catchError((_) {});
     }
     super.dispose();
   }
@@ -77,9 +82,11 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
 
     try {
       final permission = await Geolocator.checkPermission();
-      final allowed = permission == LocationPermission.always || permission == LocationPermission.whileInUse;
+      final allowed = permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse;
       if (!allowed) return;
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
       _setCurrentLocation(LatLng(position.latitude, position.longitude));
     } catch (_) {
       // The live location cubit will keep trying; keep map usable with pickup/drop markers.
@@ -101,10 +108,13 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
       if ((detailsResp['status'] ?? 0) == 200 && detailsResp['data'] is Map) {
         _order = Map<String, dynamic>.from(detailsResp['data']);
       } else {
-        final ordersResp = await _repository.getAvailableOrders(limit: 50);
+        final ordersResp = await _repository.getAvailableOrders();
         if ((ordersResp['status'] ?? 0) == 200) {
           final List raw = (ordersResp['data'] as List?) ?? [];
-          final list = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+          final list = raw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
           _order = list.cast<Map<String, dynamic>?>().firstWhere(
                 (e) => (e?['id'] ?? '').toString() == widget.orderId.toString(),
                 orElse: () => _order,
@@ -118,7 +128,10 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
       final timelineResp = await _repository.orderTimeline(widget.orderId);
       if ((timelineResp['status'] ?? 0) == 200) {
         final List raw = (timelineResp['data'] as List?) ?? [];
-        _timeline = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        _timeline = raw
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
       }
     } catch (_) {
       //
@@ -157,48 +170,49 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
 
     if (current != null) {
       _markerCubit.addOrUpdateMarker(
-            current,
-            'Driver',
-            'Driver_marker',
-            'assets/images/car_marker.png',
-            88,
-          );
+        current,
+        'Driver',
+        'Driver_marker',
+        'assets/images/car_marker.png',
+        88,
+      );
     }
     if (pickup != null) {
       _markerCubit.addOrUpdateMarker(
-            pickup,
-            'Restaurant Pickup',
-            'User_marker',
-            'assets/images/pin_user.png',
-            44,
-          );
+        pickup,
+        'Restaurant Pickup',
+        'User_marker',
+        'assets/images/pin_user.png',
+        44,
+      );
     }
     if (drop != null) {
       _markerCubit.addOrUpdateMarker(
-            drop,
-            'Customer Drop-off',
-            'Drop_marker',
-            'assets/images/drop_pin.png',
-            62,
-          );
+        drop,
+        'Customer Drop-off',
+        'Drop_marker',
+        'assets/images/drop_pin.png',
+        62,
+      );
     }
 
     final target = _isHeadingToPickup(order) ? pickup : drop;
     if (current == null || target == null) return;
 
     final status = (order['status'] ?? '').toString();
-    final routeKey = '${current.latitude.toStringAsFixed(5)},${current.longitude.toStringAsFixed(5)}'
+    final routeKey =
+        '${current.latitude.toStringAsFixed(5)},${current.longitude.toStringAsFixed(5)}'
         '-${target.latitude.toStringAsFixed(5)},${target.longitude.toStringAsFixed(5)}-$status';
     if (_lastRouteKey == routeKey) return;
     _lastRouteKey = routeKey;
 
     _polylineCubit.getPolyline(
-          sourcelat: current.latitude,
-          sourcelng: current.longitude,
-          destinationlat: target.latitude,
-          destinationlng: target.longitude,
-          isPickupRoute: _isHeadingToPickup(order),
-        );
+      sourcelat: current.latitude,
+      sourcelng: current.longitude,
+      destinationlat: target.latitude,
+      destinationlng: target.longitude,
+      isPickupRoute: _isHeadingToPickup(order),
+    );
   }
 
   String _nextStatus(String current) {
@@ -269,7 +283,8 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Ask the customer for the delivery OTP shown in their order details.'.translate(context),
+              'Ask the customer for the delivery OTP shown in their order details.'
+                  .translate(context),
               style: regular(context),
             ),
             const SizedBox(height: 14),
@@ -279,7 +294,8 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
               keyboardType: TextInputType.number,
               maxLength: 4,
               textAlign: TextAlign.center,
-              style: headingBlack(context).copyWith(fontSize: 24, letterSpacing: 8),
+              style: headingBlack(context)
+                  .copyWith(fontSize: 24, letterSpacing: 8),
               decoration: InputDecoration(
                 counterText: '',
                 hintText: '0000',
@@ -350,7 +366,10 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
       );
     }
 
-    final initial = _currentLocation ?? _pickupLatLng(order) ?? _dropLatLng(order) ?? const LatLng(23.8103, 90.4125);
+    final initial = _currentLocation ??
+        _pickupLatLng(order) ??
+        _dropLatLng(order) ??
+        const LatLng(23.8103, 90.4125);
 
     return WillPopScope(
       onWillPop: () async => true,
@@ -393,7 +412,8 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
                 currentLocation: _currentLocation,
                 busy: _busy,
                 nextStatus: _nextStatus((order['status'] ?? '').toString()),
-                nextLabel: _nextLabel(_nextStatus((order['status'] ?? '').toString())),
+                nextLabel:
+                    _nextLabel(_nextStatus((order['status'] ?? '').toString())),
                 headingToPickup: _isHeadingToPickup(order),
                 onNavigate: _openNavigation,
                 onMoveNext: _moveNext,
@@ -409,28 +429,91 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
   Future<void> _focusMap() async {
     if (!_mapReady) return;
     final controller = await _mapController.future;
-    final target = _currentLocation ?? (_order == null ? null : _pickupLatLng(_order!));
+    final target =
+        _currentLocation ?? (_order == null ? null : _pickupLatLng(_order!));
     if (target == null) return;
-    await controller.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(target: target, zoom: 16)));
+    await controller.animateCamera(CameraUpdate.newCameraPosition(
+        CameraPosition(target: target, zoom: 16)));
   }
 
   Future<void> _openNavigation() async {
     final order = _order;
+    if (order == null) {
+      showErrorToastMessage('Order is still loading. Please try again.');
+      return;
+    }
+
     final current = _currentLocation;
-    if (order == null || current == null) return;
-    final target = _isHeadingToPickup(order) ? _pickupLatLng(order) : _dropLatLng(order);
-    if (target == null) return;
-    await startLiveNavigation(
-      sourceLat: current.latitude,
-      sourceLng: current.longitude,
-      destLat: target.latitude,
-      destLng: target.longitude,
+    final target =
+        _isHeadingToPickup(order) ? _pickupLatLng(order) : _dropLatLng(order);
+    if (target == null) {
+      showErrorToastMessage(_isHeadingToPickup(order)
+          ? 'Pickup location is not ready.'
+          : 'Drop location is not ready.');
+      return;
+    }
+
+    _lastRouteKey = null;
+    _syncMap();
+    if (!_mapReady) {
+      showErrorToastMessage('Map is still loading. Please try again.');
+      return;
+    }
+
+    final controller = await _mapController.future;
+    if (current == null) {
+      await controller.animateCamera(CameraUpdate.newLatLngZoom(target, 16));
+      showErrorToastMessage(
+          'Driver location is not ready yet. Showing destination.');
+      return;
+    }
+
+    await _fitMapToPoints(controller, current, target);
+  }
+
+  Future<void> _fitMapToPoints(
+    GoogleMapController controller,
+    LatLng source,
+    LatLng destination,
+  ) async {
+    final samePoint = source.latitude == destination.latitude &&
+        source.longitude == destination.longitude;
+    if (samePoint) {
+      await controller.animateCamera(CameraUpdate.newLatLngZoom(source, 16));
+      return;
+    }
+
+    await controller.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(
+            source.latitude < destination.latitude
+                ? source.latitude
+                : destination.latitude,
+            source.longitude < destination.longitude
+                ? source.longitude
+                : destination.longitude,
+          ),
+          northeast: LatLng(
+            source.latitude > destination.latitude
+                ? source.latitude
+                : destination.latitude,
+            source.longitude > destination.longitude
+                ? source.longitude
+                : destination.longitude,
+          ),
+        ),
+        120,
+      ),
     );
   }
 
   bool _isHeadingToPickup(Map<String, dynamic> order) {
     final status = (order['status'] ?? '').toString();
-    return status == 'placed' || status == 'accepted' || status == 'preparing' || status == 'ready_for_pickup';
+    return status == 'placed' ||
+        status == 'accepted' ||
+        status == 'preparing' ||
+        status == 'ready_for_pickup';
   }
 
   LatLng? _pickupLatLng(Map<String, dynamic> order) {
@@ -451,9 +534,7 @@ class _FoodActiveDeliveryScreenState extends State<FoodActiveDeliveryScreen> {
   Future<void> _showDeliveredDialog() async {
     if (!mounted) return;
     final commission = double.tryParse(
-          (_order?['driver_commission'] ??
-                  _order?['delivery_fee'] ??
-                  '0')
+          (_order?['driver_commission'] ?? _order?['delivery_fee'] ?? '0')
               .toString(),
         ) ??
         0;
@@ -554,7 +635,8 @@ class _FoodRouteMapState extends State<_FoodRouteMap> {
               WidgetsBinding.instance.addPostFrameCallback((_) => _fitMap());
             }
             return GoogleMap(
-              initialCameraPosition: CameraPosition(target: widget.initialPosition, zoom: 15),
+              initialCameraPosition:
+                  CameraPosition(target: widget.initialPosition, zoom: 15),
               markers: _markers,
               polylines: _polylines,
               myLocationButtonEnabled: false,
@@ -582,22 +664,30 @@ class _FoodRouteMapState extends State<_FoodRouteMap> {
     ];
     if (points.isEmpty) return;
     if (points.length == 1) {
-      await controller.animateCamera(CameraUpdate.newLatLngZoom(points.first, 16));
+      await controller
+          .animateCamera(CameraUpdate.newLatLngZoom(points.first, 16));
       return;
     }
 
-    final minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-    final maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-    final minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
-    final maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+    final minLat =
+        points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+    final maxLat =
+        points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+    final minLng =
+        points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+    final maxLng =
+        points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
     if (minLat == maxLat && minLng == maxLng) {
-      await controller.animateCamera(CameraUpdate.newLatLngZoom(points.first, 16));
+      await controller
+          .animateCamera(CameraUpdate.newLatLngZoom(points.first, 16));
       return;
     }
 
     await controller.animateCamera(
       CameraUpdate.newLatLngBounds(
-        LatLngBounds(southwest: LatLng(minLat, minLng), northeast: LatLng(maxLat, maxLng)),
+        LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng)),
         110,
       ),
     );
@@ -639,8 +729,10 @@ class _FoodDeliverySheet extends StatelessWidget {
     final pickupAddress = (branch['address'] ?? '').toString();
     final dropAddress = (order['delivery_address'] ?? '').toString();
     final targetAddress = headingToPickup ? pickupAddress : dropAddress;
-    final targetLabel = headingToPickup ? 'Pickup Location' : 'Drop-off Location';
-    final targetLatLng = headingToPickup ? _latLngFromBranch(branch) : _latLngFromOrder(order);
+    final targetLabel =
+        headingToPickup ? 'Pickup Location' : 'Drop-off Location';
+    final targetLatLng =
+        headingToPickup ? _latLngFromBranch(branch) : _latLngFromOrder(order);
     final distanceKm = currentLocation != null && targetLatLng != null
         ? Geolocator.distanceBetween(
               currentLocation!.latitude,
@@ -650,7 +742,9 @@ class _FoodDeliverySheet extends StatelessWidget {
             ) /
             1000
         : null;
-    final etaMin = distanceKm == null ? null : ((distanceKm / 28) * 60).ceil().clamp(1, 999).toInt();
+    final etaMin = distanceKm == null
+        ? null
+        : ((distanceKm / 28) * 60).ceil().clamp(1, 999).toInt();
 
     return DraggableScrollableSheet(
       initialChildSize: .40,
@@ -662,163 +756,200 @@ class _FoodDeliverySheet extends StatelessWidget {
         return SizedBox(
           width: double.infinity,
           child: Column(
-          children: [
-            Center(
-              child: InkWell(
-                onTap: onNavigate,
-                borderRadius: BorderRadius.circular(40),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 34, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: yelloColor,
-                    borderRadius: BorderRadius.circular(40),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: .16),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.navigation_rounded, color: Colors.black),
-                      const SizedBox(width: 12),
-                      Text(
-                        headingToPickup ? 'Go to PickUp'.translate(context) : 'Go to Drop'.translate(context),
-                        style: headingBlackBold(context).copyWith(fontSize: 17),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, -2)),
-                  ],
-                ),
-                child: RefreshIndicator(
-                  onRefresh: onRefresh,
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(22, 22, 22, 26),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: InkWell(
+                  onTap: onNavigate,
+                  borderRadius: BorderRadius.circular(40),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 34, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: yelloColor,
+                      borderRadius: BorderRadius.circular(40),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: .16),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              height: 58,
-                              width: 58,
-                              decoration: BoxDecoration(
-                                color: themeColor.withValues(alpha: .14),
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: const Icon(Icons.fastfood_rounded, color: Colors.black87, size: 30),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(customerName, style: headingBlackBold(context).copyWith(fontSize: 17)),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.star_rounded, color: yelloColor, size: 20),
-                                      const SizedBox(width: 3),
-                                      Text('0.00', style: regular(context).copyWith(color: Colors.black54)),
-                                      const SizedBox(width: 10),
-                                      _StatusBadge(status: status),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (customerPhone.isNotEmpty)
-                              InkWell(
-                                onTap: () => launchDialPad(customerPhone),
-                                borderRadius: BorderRadius.circular(999),
-                                child: Container(
-                                  height: 54,
-                                  width: 54,
-                                  decoration: BoxDecoration(
-                                    color: greentext,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: const Icon(Icons.call_rounded, color: Colors.white),
-                                ),
-                              ),
-                          ],
+                        const Icon(Icons.navigation_rounded,
+                            color: Colors.black),
+                        const SizedBox(width: 12),
+                        Text(
+                          headingToPickup
+                              ? 'Go to PickUp'.translate(context)
+                              : 'Go to Drop'.translate(context),
+                          style:
+                              headingBlackBold(context).copyWith(fontSize: 17),
                         ),
-                        const SizedBox(height: 18),
-                        const Divider(height: 1),
-                        const SizedBox(height: 18),
-                        _MetricStrip(distanceKm: distanceKm, etaMin: etaMin, order: order),
-                        const SizedBox(height: 12),
-                        _ActivePaymentBanner(order: order),
-                        const SizedBox(height: 20),
-                        Text(targetLabel.translate(context), style: regular2(context).copyWith(fontSize: 16)),
-                        const SizedBox(height: 14),
-                        _AddressRow(
-                          icon: headingToPickup ? Icons.storefront_rounded : Icons.location_on_rounded,
-                          iconColor: headingToPickup ? themeColor : greentext,
-                          address: targetAddress.isEmpty ? '-' : targetAddress,
-                        ),
-                        if (pickupAddress.isNotEmpty && dropAddress.isNotEmpty) ...[
-                          const SizedBox(height: 14),
-                          _AddressRow(
-                            icon: headingToPickup ? Icons.flag_rounded : Icons.storefront_rounded,
-                            iconColor: Colors.black45,
-                            address: headingToPickup ? dropAddress : pickupAddress,
-                            compact: true,
-                          ),
-                        ],
-                        const SizedBox(height: 22),
-                        if (nextStatus.isNotEmpty)
-                          AbsorbPointer(
-                            absorbing: busy,
-                            child: CustomSlideButton(
-                              key: ValueKey(nextStatus),
-                              textActiveColor: Colors.white,
-                              textInactiveColor: Colors.white,
-                              activeColor: nextStatus == 'delivered' ? greentext : themeColor,
-                              inactiveColor: nextStatus == 'delivered' ? greentext : themeColor,
-                              iconColor: Colors.white,
-                              iconBoxColor: Colors.white.withValues(alpha: .35),
-                              isOnRide: false,
-                              acceptedText: 'DONE',
-                              defaultText: busy ? 'PLEASE WAIT...' : nextLabel,
-                              onChanged: (value) async {
-                                if (value && !busy) {
-                                  await onMoveNext();
-                                }
-                              },
-                            ),
-                          )
-                        else
-                          _WaitingStatus(status: status),
-                        const SizedBox(height: 22),
-                        if (timeline.isNotEmpty) ...[
-                          Text('Timeline'.translate(context), style: headingBlack(context).copyWith(fontSize: 16)),
-                          const SizedBox(height: 8),
-                          ...timeline.take(5).map((item) => _TimelineRow(item: item)),
-                        ],
                       ],
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(26)),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 12,
+                          offset: Offset(0, -2)),
+                    ],
+                  ),
+                  child: RefreshIndicator(
+                    onRefresh: onRefresh,
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 26),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                height: 58,
+                                width: 58,
+                                decoration: BoxDecoration(
+                                  color: themeColor.withValues(alpha: .14),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: const Icon(Icons.fastfood_rounded,
+                                    color: Colors.black87, size: 30),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(customerName,
+                                        style: headingBlackBold(context)
+                                            .copyWith(fontSize: 17)),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.star_rounded,
+                                            color: yelloColor, size: 20),
+                                        const SizedBox(width: 3),
+                                        Text('0.00',
+                                            style: regular(context).copyWith(
+                                                color: Colors.black54)),
+                                        const SizedBox(width: 10),
+                                        _StatusBadge(status: status),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (customerPhone.isNotEmpty)
+                                InkWell(
+                                  onTap: () => launchDialPad(customerPhone),
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: Container(
+                                    height: 54,
+                                    width: 54,
+                                    decoration: BoxDecoration(
+                                      color: greentext,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: const Icon(Icons.call_rounded,
+                                        color: Colors.white),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          const Divider(height: 1),
+                          const SizedBox(height: 18),
+                          _MetricStrip(
+                              distanceKm: distanceKm,
+                              etaMin: etaMin,
+                              order: order),
+                          const SizedBox(height: 12),
+                          _ActivePaymentBanner(order: order),
+                          const SizedBox(height: 20),
+                          Text(targetLabel.translate(context),
+                              style: regular2(context).copyWith(fontSize: 16)),
+                          const SizedBox(height: 14),
+                          _AddressRow(
+                            icon: headingToPickup
+                                ? Icons.storefront_rounded
+                                : Icons.location_on_rounded,
+                            iconColor: headingToPickup ? themeColor : greentext,
+                            address:
+                                targetAddress.isEmpty ? '-' : targetAddress,
+                          ),
+                          if (pickupAddress.isNotEmpty &&
+                              dropAddress.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            _AddressRow(
+                              icon: headingToPickup
+                                  ? Icons.flag_rounded
+                                  : Icons.storefront_rounded,
+                              iconColor: Colors.black45,
+                              address:
+                                  headingToPickup ? dropAddress : pickupAddress,
+                              compact: true,
+                            ),
+                          ],
+                          const SizedBox(height: 22),
+                          if (nextStatus.isNotEmpty)
+                            AbsorbPointer(
+                              absorbing: busy,
+                              child: CustomSlideButton(
+                                key: ValueKey(nextStatus),
+                                textActiveColor: Colors.white,
+                                textInactiveColor: Colors.white,
+                                activeColor: nextStatus == 'delivered'
+                                    ? greentext
+                                    : themeColor,
+                                inactiveColor: nextStatus == 'delivered'
+                                    ? greentext
+                                    : themeColor,
+                                iconColor: Colors.white,
+                                iconBoxColor:
+                                    Colors.white.withValues(alpha: .35),
+                                isOnRide: false,
+                                acceptedText: 'DONE',
+                                defaultText:
+                                    busy ? 'PLEASE WAIT...' : nextLabel,
+                                onChanged: (value) async {
+                                  if (value && !busy) {
+                                    await onMoveNext();
+                                  }
+                                },
+                              ),
+                            )
+                          else
+                            _WaitingStatus(status: status),
+                          const SizedBox(height: 22),
+                          if (timeline.isNotEmpty) ...[
+                            Text('Timeline'.translate(context),
+                                style: headingBlack(context)
+                                    .copyWith(fontSize: 16)),
+                            const SizedBox(height: 8),
+                            ...timeline
+                                .take(5)
+                                .map((item) => _TimelineRow(item: item)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -849,7 +980,9 @@ class _MetricStrip extends StatelessWidget {
         Expanded(
           child: _MiniMetric(
             label: 'Distance',
-            value: distanceKm == null ? '-- km' : '${distanceKm!.toStringAsFixed(2)} km',
+            value: distanceKm == null
+                ? '-- km'
+                : '${distanceKm!.toStringAsFixed(2)} km',
             icon: Icons.route_rounded,
           ),
         ),
@@ -884,8 +1017,10 @@ class _ActivePaymentBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = (order['payment_status'] ?? '').toString();
-    final method = (order['payment_method'] ?? '').toString().replaceAll('_', ' ').trim();
-    final amount = double.tryParse((order['total_amount'] ?? '').toString()) ?? 0;
+    final method =
+        (order['payment_method'] ?? '').toString().replaceAll('_', ' ').trim();
+    final amount =
+        double.tryParse((order['total_amount'] ?? '').toString()) ?? 0;
     final isPaid = status.trim().toLowerCase() == 'paid';
     final color = isPaid ? greentext : Colors.orange.shade800;
 
@@ -899,7 +1034,8 @@ class _ActivePaymentBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(isPaid ? Icons.verified_rounded : Icons.schedule_rounded, color: color, size: 27),
+          Icon(isPaid ? Icons.verified_rounded : Icons.schedule_rounded,
+              color: color, size: 27),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -907,19 +1043,26 @@ class _ActivePaymentBanner extends StatelessWidget {
               children: [
                 Text(
                   isPaid ? 'PAID • DO NOT COLLECT CASH' : 'PAYMENT PENDING',
-                  style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                      color: color, fontSize: 13, fontWeight: FontWeight.w900),
                 ),
                 if (method.isNotEmpty)
                   Text(
                     method.toUpperCase(),
-                    style: TextStyle(color: color.withValues(alpha: .8), fontSize: 11, fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                        color: color.withValues(alpha: .8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800),
                   ),
               ],
             ),
           ),
           Text(
-            amount == amount.roundToDouble() ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2),
-            style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w900),
+            amount == amount.roundToDouble()
+                ? amount.toStringAsFixed(0)
+                : amount.toStringAsFixed(2),
+            style: TextStyle(
+                color: color, fontSize: 17, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -951,9 +1094,14 @@ class _MiniMetric extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.black54, size: 18),
           const SizedBox(height: 8),
-          Text(label.translate(context), style: regular(context).copyWith(fontSize: 11, color: Colors.black54)),
+          Text(label.translate(context),
+              style: regular(context)
+                  .copyWith(fontSize: 11, color: Colors.black54)),
           const SizedBox(height: 2),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: headingBlackBold(context).copyWith(fontSize: 13)),
+          Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: headingBlackBold(context).copyWith(fontSize: 13)),
         ],
       ),
     );
@@ -991,7 +1139,9 @@ class _AddressRow extends StatelessWidget {
         Expanded(
           child: Text(
             address,
-            style: compact ? regular(context).copyWith(color: Colors.black54) : headingBlack(context).copyWith(fontSize: 15),
+            style: compact
+                ? regular(context).copyWith(color: Colors.black54)
+                : headingBlack(context).copyWith(fontSize: 15),
           ),
         ),
       ],
@@ -1014,7 +1164,10 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         status.replaceAll('_', ' ').toUpperCase(),
-        style: TextStyle(fontSize: 10, color: _statusColor(status), fontWeight: FontWeight.w800),
+        style: TextStyle(
+            fontSize: 10,
+            color: _statusColor(status),
+            fontWeight: FontWeight.w800),
       ),
     );
   }
@@ -1036,7 +1189,9 @@ class _WaitingStatus extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text(
-        delivered ? 'Delivery Completed'.translate(context) : 'Waiting for restaurant to prepare'.translate(context),
+        delivered
+            ? 'Delivery Completed'.translate(context)
+            : 'Waiting for restaurant to prepare'.translate(context),
         style: TextStyle(
           fontWeight: FontWeight.w800,
           color: delivered ? greentext : Colors.orange,
@@ -1062,7 +1217,9 @@ class _TimelineRow extends StatelessWidget {
           Icon(Icons.check_circle_rounded, color: greentext, size: 18),
           const SizedBox(width: 8),
           Expanded(child: Text(to.isEmpty ? '-' : to, style: regular(context))),
-          Text(date.length > 16 ? date.substring(0, 16) : date, style: regular(context).copyWith(fontSize: 11, color: Colors.black45)),
+          Text(date.length > 16 ? date.substring(0, 16) : date,
+              style: regular(context)
+                  .copyWith(fontSize: 11, color: Colors.black45)),
         ],
       ),
     );

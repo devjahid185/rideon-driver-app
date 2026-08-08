@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
- import 'package:ride_on_driver/core/utils/translate.dart';
+import 'package:ride_on_driver/core/utils/translate.dart';
 import 'package:ride_on_driver/presentation/screens/search/drop_otp_verify_screen.dart';
 import 'package:ride_on_driver/presentation/screens/search/pickup_parcel_image_screen.dart';
 import '../../../core/extensions/workspace.dart';
@@ -276,8 +276,7 @@ class _RideScreenState extends State<RideScreens> {
 
               if (state is GetRideDataSuccess) {
                 rideData = state.requestDataModel;
-                parcalData=state.requestDataModel?.parcalData;
-               
+                parcalData = state.requestDataModel?.parcalData;
 
                 context
                     .read<UpdateDriverParameterCubit>()
@@ -507,17 +506,7 @@ class _RideScreenState extends State<RideScreens> {
                       if (!state.rideArrivedStatus) {
                         return CustomRideBottomSheet(
                           onTap: () {
-                            startLiveNavigation(
-                                sourceLat: context
-                                    .read<UpdateDriverParameterCubit>()
-                                    .state
-                                    .lat,
-                                sourceLng: context
-                                    .read<UpdateDriverParameterCubit>()
-                                    .state
-                                    .lng,
-                                destLat: rideData?.pickupLocation?.lat ?? 0.0,
-                                destLng: rideData?.pickupLocation?.lng ?? 0.0);
+                            _focusInAppRoute(toPickup: true);
                           },
                           rideRequest: rideData!,
                           pickupString: "Go to PickUp",
@@ -539,7 +528,9 @@ class _RideScreenState extends State<RideScreens> {
                       } else if (!state.rideStartEndStatus &&
                           state.rideArrivedStatus) {
                         return CustomRideBottomSheetForStartRide(
-                          onTap: () {},
+                          onTap: () {
+                            _focusInAppRoute(toPickup: false);
+                          },
                           rideRequest: rideData!,
                           pickupString: "Go to Drop",
                           acceptedText: "",
@@ -564,7 +555,10 @@ class _RideScreenState extends State<RideScreens> {
                     listener: (context, state) {},
                   ),
                   if (isOnDutyCompleted && rideData != null)
-                    CustomBottomSheet(rideRequest: rideData!),
+                    CustomBottomSheet(
+                      rideRequest: rideData!,
+                      onNavigateToDrop: () => _focusInAppRoute(toPickup: false),
+                    ),
                 ],
               );
             },
@@ -653,8 +647,99 @@ class _RideScreenState extends State<RideScreens> {
     }
   }
 
+  void _focusInAppRoute({required bool toPickup}) {
+    final current = currentLocation;
+    final ride = rideData;
+    if (current == null || ride == null) {
+      showErrorToastMessage("Current location is not ready yet.");
+      return;
+    }
+
+    final targetLat =
+        toPickup ? ride.pickupLocation?.lat : ride.dropoffLocation?.lat;
+    final targetLng =
+        toPickup ? ride.pickupLocation?.lng : ride.dropoffLocation?.lng;
+
+    if (targetLat == null ||
+        targetLng == null ||
+        targetLat == 0.0 ||
+        targetLng == 0.0) {
+      showErrorToastMessage(toPickup
+          ? "Pickup location is not ready."
+          : "Drop location is not ready.");
+      return;
+    }
+
+    final target = LatLng(targetLat, targetLng);
+    final markerCubit = context.read<MarkerCubit>();
+
+    markerCubit.addOrUpdateMarker(
+      current,
+      'Driver',
+      'Driver_marker',
+      'assets/images/car_marker.png',
+      90,
+    );
+
+    markerCubit.addOrUpdateMarker(
+      target,
+      toPickup ? 'Pickup Location' : 'Drop Location',
+      toPickup ? 'User_marker' : 'Drop_marker',
+      toPickup ? 'assets/images/pin_user.png' : 'assets/images/drop_pin.png',
+      toPickup ? 40 : 65,
+    );
+
+    context.read<GetPolylineCubit>().getPolyline(
+          sourcelat: current.latitude,
+          sourcelng: current.longitude,
+          isPickupRoute: toPickup,
+          destinationlat: target.latitude,
+          destinationlng: target.longitude,
+        );
+
+    _fitMapToPoints(current, target);
+  }
+
+  Future<void> _fitMapToPoints(LatLng source, LatLng destination) async {
+    final controller = mapController;
+    if (controller == null) return;
+
+    final samePoint = source.latitude == destination.latitude &&
+        source.longitude == destination.longitude;
+    if (samePoint) {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(source, 16),
+      );
+      return;
+    }
+
+    final southWest = LatLng(
+      source.latitude < destination.latitude
+          ? source.latitude
+          : destination.latitude,
+      source.longitude < destination.longitude
+          ? source.longitude
+          : destination.longitude,
+    );
+    final northEast = LatLng(
+      source.latitude > destination.latitude
+          ? source.latitude
+          : destination.latitude,
+      source.longitude > destination.longitude
+          ? source.longitude
+          : destination.longitude,
+    );
+
+    await controller.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(southwest: southWest, northeast: northEast),
+        120,
+      ),
+    );
+  }
+
   void _handleArrivedStatus() {
-     final driverParams = context.read<UpdateDriverParameterCubit>();
+    final driverParams = context.read<UpdateDriverParameterCubit>();
     driverParams.removeBookingId();
 
     context.read<UpdateBookingIdCubit>()
@@ -665,11 +750,9 @@ class _RideScreenState extends State<RideScreens> {
           rideId: widget.rideId ?? "",
           newStatus: "pick_up",
         );
-         
 
- 
     Future.delayed(const Duration(milliseconds: 200), () {
-      if (( parcalData!.name ?? "").isEmpty &&
+      if ((parcalData!.name ?? "").isEmpty &&
           (parcalData!.reciverNumber ?? "").isEmpty) {
         goTo(OtpVerifyRideScreen(
           // ignore: use_build_context_synchronously
@@ -756,8 +839,13 @@ class _RideScreenState extends State<RideScreens> {
 
 class CustomBottomSheet extends StatefulWidget {
   final RealTimeRideRequest rideRequest;
+  final VoidCallback onNavigateToDrop;
 
-  const CustomBottomSheet({super.key, required this.rideRequest});
+  const CustomBottomSheet({
+    super.key,
+    required this.rideRequest,
+    required this.onNavigateToDrop,
+  });
 
   @override
   State<CustomBottomSheet> createState() => _CustomBottomSheetState();
@@ -804,21 +892,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet> {
                   const SizedBox(),
                   const SizedBox(),
                   InkWell(
-                    onTap: () {
-                      startLiveNavigation(
-                          sourceLat: context
-                              .read<UpdateDriverParameterCubit>()
-                              .state
-                              .lat,
-                          sourceLng: context
-                              .read<UpdateDriverParameterCubit>()
-                              .state
-                              .lng,
-                          destLat:
-                              widget.rideRequest.dropoffLocation?.lat ?? 0.0,
-                          destLng:
-                              widget.rideRequest.dropoffLocation?.lng ?? 0.0);
-                    },
+                    onTap: widget.onNavigateToDrop,
                     child: Container(
                       alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(horizontal: 20),

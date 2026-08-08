@@ -65,13 +65,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final type = statuses[selectedIndex].toLowerCase();
     await context.read<HistoryCubit>().getHistoryData(
-      context: context,
-      bookingKeyMap: {
-        'type': type,
-        'offset': offset.toString(),
-      },
-      type: type,
-    );
+          context: context,
+          bookingKeyMap: {
+            'type': type,
+            'offset': offset.toString(),
+          },
+          type: type,
+        );
   }
 
   String? _foodStatusForSelectedTab() {
@@ -97,7 +97,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (mounted) setState(() => foodLoading = true);
     try {
       final assignedResponse =
-          await _foodRepository.getMyOrders(limit: 200, status: foodStatus);
+          await _foodRepository.getMyOrders(status: foodStatus);
       final assignedRaw = assignedResponse['data'];
       final assigned = assignedRaw is List
           ? assignedRaw
@@ -108,15 +108,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
       List<Map<String, dynamic>> available = [];
       if (statuses[selectedIndex].toLowerCase() == 'all') {
-        final availableResponse =
-            await _foodRepository.getAvailableOrders(limit: 50);
+        final availableResponse = await _foodRepository.getAvailableOrders();
         final availableRaw = availableResponse['data'];
         available = availableRaw is List
             ? availableRaw
                 .whereType<Map>()
                 .map((e) => Map<String, dynamic>.from(e))
-                .where((order) => order['driver_id'] == null)
-                .toList()
+                .where((order) {
+                final driverId = (order['driver_id'] ?? '').toString();
+                return driverId.isEmpty || driverId == 'null';
+              }).toList()
             : <Map<String, dynamic>>[];
       }
 
@@ -138,8 +139,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Future<void> _acceptAvailableFoodOrder(
-      Map<String, dynamic> order) async {
+  Future<void> _acceptAvailableFoodOrder(Map<String, dynamic> order) async {
     final orderId = int.tryParse('${order['id']}') ?? 0;
     if (orderId <= 0 || acceptingFoodOrderId != null) return;
 
@@ -148,8 +148,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         final orderNo = (order['order_number'] ?? 'Food Order').toString();
-        final amount =
-            double.tryParse('${order['total_amount'] ?? 0}') ?? 0;
+        final amount = double.tryParse(
+                '${order['driver_commission'] ?? order['delivery_fee'] ?? 0}') ??
+            0;
         return SafeArea(
           child: Container(
             margin: const EdgeInsets.all(14),
@@ -174,18 +175,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 const SizedBox(height: 14),
                 Text(
                   'Accept this delivery?'.translate(context),
-                  style:
-                      headingBlackBold(context).copyWith(fontSize: 19),
+                  style: headingBlackBold(context).copyWith(fontSize: 19),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   '$orderNo  |  $currency ${_formatMoney(amount)}',
-                  style: regular(context)
-                      .copyWith(color: Colors.black54),
+                  style: regular(context).copyWith(color: Colors.black54),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'This order is still unassigned. Once accepted, it will be added to your active deliveries.'
+                  'This order is still available. Once accepted, it will be added to your active deliveries.'
                       .translate(context),
                   textAlign: TextAlign.center,
                   style: regular(context)
@@ -196,8 +195,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () =>
-                            Navigator.pop(sheetContext, false),
+                        onPressed: () => Navigator.pop(sheetContext, false),
                         child: Text('Not now'.translate(context)),
                       ),
                     ),
@@ -209,8 +207,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           foregroundColor: Colors.white,
                           minimumSize: const Size.fromHeight(48),
                         ),
-                        onPressed: () =>
-                            Navigator.pop(sheetContext, true),
+                        onPressed: () => Navigator.pop(sheetContext, true),
                         icon: const Icon(Icons.check_circle_rounded),
                         label: Text('Accept Order'.translate(context)),
                       ),
@@ -244,8 +241,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                FoodActiveDeliveryScreen(orderId: orderId),
+            builder: (_) => FoodActiveDeliveryScreen(orderId: orderId),
           ),
         );
         if (mounted) await _loadFoodOrders();
@@ -322,7 +318,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 surfaceTintColor: Colors.transparent,
                 title: Text(
                   'History'.translate(context),
-                  style: headingBlackBold(context).copyWith(fontSize: 24, color: blackColor),
+                  style: headingBlackBold(context)
+                      .copyWith(fontSize: 24, color: blackColor),
                 ),
                 backgroundColor: const Color(0xFFF6F7FB),
                 automaticallyImplyLeading: false,
@@ -330,7 +327,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
         body: BlocBuilder<HistoryCubit, HistoryState>(
           builder: (context, state) {
-            if (state is HistorySuccess && statuses[selectedIndex].toLowerCase() == state.type) {
+            if (state is HistorySuccess &&
+                statuses[selectedIndex].toLowerCase() == state.type) {
               isPaginating = true;
               if (offset == 0) {
                 bookings = state.bookings ?? [];
@@ -343,7 +341,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               });
             }
 
-            final loadingInitial = state is HistoryLoading && isPaginating && bookings.isEmpty && foodOrders.isEmpty;
+            final loadingInitial = state is HistoryLoading &&
+                isPaginating &&
+                bookings.isEmpty &&
+                foodOrders.isEmpty;
             final entries = _mixedEntries();
 
             return SmartRefresher(
@@ -358,8 +359,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   _HeaderSummary(
                     selectedLabel: statuses[selectedIndex],
                     rideCount: bookings.length,
-                    foodCount:
-                        foodOrders.length + availableFoodOrders.length,
+                    foodCount: foodOrders.length + availableFoodOrders.length,
                     totalAmount: _totalAmount(),
                   ),
                   _StatusSelector(
@@ -378,15 +378,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       fetchData(isInitial: true);
                     },
                   ),
-                  if (loadingInitial ||
-                      (foodLoading && entries.isEmpty))
+                  if (loadingInitial || (foodLoading && entries.isEmpty))
                     const _HistoryShimmerList()
                   else if (entries.isEmpty)
                     _EmptyHistory(status: statuses[selectedIndex])
                   else
                     Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
                       child: Column(
                         children: [
                           ...entries.map((entry) {
@@ -395,14 +393,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     order: entry.foodOrder!,
                                     formatDate: formatSimpleDate,
                                     formatTime: formatTime,
-                                    isAvailable:
-                                        entry.isAvailableFood,
-                                    isAccepting:
-                                        acceptingFoodOrderId ==
-                                            int.tryParse(
-                                                '${entry.foodOrder!['id']}'),
-                                    onAccept:
-                                        _acceptAvailableFoodOrder,
+                                    isAvailable: entry.isAvailableFood,
+                                    isAccepting: acceptingFoodOrderId ==
+                                        int.tryParse(
+                                            '${entry.foodOrder!['id']}'),
+                                    onAccept: _acceptAvailableFoodOrder,
                                   )
                                 : _RideHistoryCard(
                                     rideData: entry.booking!,
@@ -410,8 +405,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     formatTime: formatTime,
                                   );
                           }),
-                          if (foodLoading)
-                            const _SmallLoadingCard(),
+                          if (foodLoading) const _SmallLoadingCard(),
                         ],
                       ),
                     ),
@@ -428,8 +422,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final entries = <_HistoryEntry>[
       ...bookings.map((booking) => _HistoryEntry.ride(booking)),
       ...foodOrders.map((order) => _HistoryEntry.food(order)),
-      ...availableFoodOrders
-          .map((order) => _HistoryEntry.availableFood(order)),
+      ...availableFoodOrders.map((order) => _HistoryEntry.availableFood(order)),
     ];
     entries.sort((a, b) => b.date.compareTo(a.date));
     return entries;
@@ -509,12 +502,17 @@ class _HeaderSummary extends StatelessWidget {
                   children: [
                     Text(
                       '${selectedLabel.translate(context)} history',
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       'Ride and food delivery records'.translate(context),
-                      style: TextStyle(color: Colors.white.withValues(alpha: .78), fontSize: 12),
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: .78),
+                          fontSize: 12),
                     ),
                   ],
                 ),
@@ -524,9 +522,11 @@ class _HeaderSummary extends StatelessWidget {
           const SizedBox(height: 18),
           Row(
             children: [
-              Expanded(child: _SummaryTile(label: 'Orders', value: '$totalCount')),
+              Expanded(
+                  child: _SummaryTile(label: 'Orders', value: '$totalCount')),
               const SizedBox(width: 10),
-              Expanded(child: _SummaryTile(label: 'Rides', value: '$rideCount')),
+              Expanded(
+                  child: _SummaryTile(label: 'Rides', value: '$rideCount')),
               const SizedBox(width: 10),
               Expanded(child: _SummaryTile(label: 'Food', value: '$foodCount')),
             ],
@@ -544,7 +544,8 @@ class _HeaderSummary extends StatelessWidget {
 }
 
 class _SummaryTile extends StatelessWidget {
-  const _SummaryTile({required this.label, required this.value, this.wide = false});
+  const _SummaryTile(
+      {required this.label, required this.value, this.wide = false});
 
   final String label;
   final String value;
@@ -563,9 +564,15 @@ class _SummaryTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label.translate(context), style: TextStyle(color: Colors.white.withValues(alpha: .68), fontSize: 11)),
+          Text(label.translate(context),
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: .68), fontSize: 11)),
           const SizedBox(height: 3),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+          Text(value,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -573,7 +580,10 @@ class _SummaryTile extends StatelessWidget {
 }
 
 class _StatusSelector extends StatelessWidget {
-  const _StatusSelector({required this.statuses, required this.selectedIndex, required this.onChanged});
+  const _StatusSelector(
+      {required this.statuses,
+      required this.selectedIndex,
+      required this.onChanged});
 
   final List<String> statuses;
   final int selectedIndex;
@@ -597,9 +607,15 @@ class _StatusSelector extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected ? themeColor : Colors.white,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: isSelected ? themeColor : const Color(0xFFE2E6EF)),
+                border: Border.all(
+                    color: isSelected ? themeColor : const Color(0xFFE2E6EF)),
                 boxShadow: isSelected
-                    ? [BoxShadow(color: themeColor.withValues(alpha: .20), blurRadius: 14, offset: const Offset(0, 7))]
+                    ? [
+                        BoxShadow(
+                            color: themeColor.withValues(alpha: .20),
+                            blurRadius: 14,
+                            offset: const Offset(0, 7))
+                      ]
                     : null,
               ),
               child: Text(
@@ -621,7 +637,10 @@ class _StatusSelector extends StatelessWidget {
 }
 
 class _RideHistoryCard extends StatelessWidget {
-  const _RideHistoryCard({required this.rideData, required this.formatDate, required this.formatTime});
+  const _RideHistoryCard(
+      {required this.rideData,
+      required this.formatDate,
+      required this.formatTime});
 
   final Bookings rideData;
   final String Function(String) formatDate;
@@ -638,8 +657,11 @@ class _RideHistoryCard extends StatelessWidget {
     return _HistoryCardShell(
       onTap: () => goTo(HistoryDetailScreen(rideData: rideData)),
       accentColor: isParcel ? orangeColor : themeColor,
-      leadingIcon: isParcel ? Icons.inventory_2_rounded : Icons.local_taxi_rounded,
-      title: isParcel ? 'Parcel Delivery'.translate(context) : 'Ride Booking'.translate(context),
+      leadingIcon:
+          isParcel ? Icons.inventory_2_rounded : Icons.local_taxi_rounded,
+      title: isParcel
+          ? 'Parcel Delivery'.translate(context)
+          : 'Ride Booking'.translate(context),
       subtitle: formatDate(date),
       trailing: '$currency ${rideData.total ?? 0}',
       status: status,
@@ -647,17 +669,26 @@ class _RideHistoryCard extends StatelessWidget {
       child: Column(
         children: [
           _RouteLine(
-            pickup: pickup.isEmpty ? 'Pickup location not available'.translate(context) : pickup,
-            drop: drop.isEmpty ? 'Drop-off location not available'.translate(context) : drop,
+            pickup: pickup.isEmpty
+                ? 'Pickup location not available'.translate(context)
+                : pickup,
+            drop: drop.isEmpty
+                ? 'Drop-off location not available'.translate(context)
+                : drop,
             pickupIcon: Icons.radio_button_checked_rounded,
             dropIcon: Icons.location_on_rounded,
           ),
           const SizedBox(height: 14),
           _CardFooter(
             leftIcon: Icons.access_time_rounded,
-            leftText: formatTime(date).isEmpty ? formatDate(date) : formatTime(date),
-            rightIcon: isParcel ? Icons.shopping_bag_rounded : Icons.directions_car_filled_rounded,
-            rightText: isParcel ? 'Parcel'.translate(context) : 'Ride'.translate(context),
+            leftText:
+                formatTime(date).isEmpty ? formatDate(date) : formatTime(date),
+            rightIcon: isParcel
+                ? Icons.shopping_bag_rounded
+                : Icons.directions_car_filled_rounded,
+            rightText: isParcel
+                ? 'Parcel'.translate(context)
+                : 'Ride'.translate(context),
           ),
         ],
       ),
@@ -692,7 +723,8 @@ class _FoodHistoryCard extends StatelessWidget {
           '${order['driver_commission'] ?? order['delivery_fee'] ?? 0}',
         ) ??
         0;
-    final createdAt = (order['created_at'] ?? order['placed_at'] ?? '').toString();
+    final createdAt =
+        (order['created_at'] ?? order['placed_at'] ?? '').toString();
     final restaurant = _asMap(order['restaurant']) ?? {};
     final branch = _asMap(order['branch']) ?? {};
     final pickup = [
@@ -704,8 +736,7 @@ class _FoodHistoryCard extends StatelessWidget {
     return _HistoryCardShell(
       onTap: isAvailable || orderId <= 0
           ? null
-          : () =>
-              goTo(FoodActiveDeliveryScreen(orderId: orderId)),
+          : () => goTo(FoodActiveDeliveryScreen(orderId: orderId)),
       accentColor: isAvailable ? themeColor : _foodStatusColor(status),
       leadingIcon: Icons.fastfood_rounded,
       title: orderNo.isEmpty ? 'Food Delivery'.translate(context) : orderNo,
@@ -714,20 +745,25 @@ class _FoodHistoryCard extends StatelessWidget {
       status: isAvailable
           ? 'Available'.translate(context)
           : _foodStatusLabel(status).translate(context),
-      statusColor:
-          isAvailable ? themeColor : _foodStatusColor(status),
+      statusColor: isAvailable ? themeColor : _foodStatusColor(status),
       child: Column(
         children: [
           _RouteLine(
-            pickup: pickup.isEmpty ? 'Restaurant pickup'.translate(context) : pickup,
-            drop: drop.isEmpty ? 'Delivery address not available'.translate(context) : drop,
+            pickup: pickup.isEmpty
+                ? 'Restaurant pickup'.translate(context)
+                : pickup,
+            drop: drop.isEmpty
+                ? 'Delivery address not available'.translate(context)
+                : drop,
             pickupIcon: Icons.storefront_rounded,
             dropIcon: Icons.location_on_rounded,
           ),
           const SizedBox(height: 14),
           _CardFooter(
             leftIcon: Icons.access_time_rounded,
-            leftText: formatTime(createdAt).isEmpty ? formatDate(createdAt) : formatTime(createdAt),
+            leftText: formatTime(createdAt).isEmpty
+                ? formatDate(createdAt)
+                : formatTime(createdAt),
             rightIcon: Icons.payments_outlined,
             rightText:
                 '${'Order total'.translate(context)}: $currency ${_formatMoney(total)}',
@@ -754,8 +790,7 @@ class _FoodHistoryCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     isAvailable
-                        ? 'Your earning after delivery'
-                            .translate(context)
+                        ? 'Available delivery earning'.translate(context)
                         : 'Driver earning'.translate(context),
                     style: regular(context).copyWith(
                       color: appgreen,
@@ -786,8 +821,7 @@ class _FoodHistoryCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                onPressed:
-                    isAccepting ? null : () => onAccept(order),
+                onPressed: isAccepting ? null : () => onAccept(order),
                 icon: isAccepting
                     ? const SizedBox(
                         height: 18,
@@ -800,8 +834,7 @@ class _FoodHistoryCard extends StatelessWidget {
                     : const Icon(Icons.delivery_dining_rounded),
                 label: Text(isAccepting
                     ? 'Accepting...'.translate(context)
-                    : 'Accept this available order'
-                        .translate(context)),
+                    : 'Accept this available order'.translate(context)),
               ),
             ),
           ],
@@ -872,16 +905,24 @@ class _HistoryCardShell extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: headingBlackBold(context).copyWith(fontSize: 16)),
+                      Text(title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              headingBlackBold(context).copyWith(fontSize: 16)),
                       const SizedBox(height: 3),
-                      Text(subtitle, style: regular(context).copyWith(fontSize: 12, color: Colors.black54)),
+                      Text(subtitle,
+                          style: regular(context)
+                              .copyWith(fontSize: 12, color: Colors.black54)),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(trailing, style: headingBlackBold(context).copyWith(fontSize: 15, color: greentext)),
+                    Text(trailing,
+                        style: headingBlackBold(context)
+                            .copyWith(fontSize: 15, color: greentext)),
                     const SizedBox(height: 7),
                     _StatusPill(text: status, color: statusColor),
                   ],
@@ -898,7 +939,11 @@ class _HistoryCardShell extends StatelessWidget {
 }
 
 class _RouteLine extends StatelessWidget {
-  const _RouteLine({required this.pickup, required this.drop, required this.pickupIcon, required this.dropIcon});
+  const _RouteLine(
+      {required this.pickup,
+      required this.drop,
+      required this.pickupIcon,
+      required this.dropIcon});
 
   final String pickup;
   final String drop;
@@ -913,7 +958,11 @@ class _RouteLine extends StatelessWidget {
         Column(
           children: [
             Icon(pickupIcon, size: 20, color: themeColor),
-            Container(width: 2, height: 28, margin: const EdgeInsets.symmetric(vertical: 4), color: const Color(0xFFD8DEEA)),
+            Container(
+                width: 2,
+                height: 28,
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                color: const Color(0xFFD8DEEA)),
             Icon(dropIcon, size: 21, color: Colors.black87),
           ],
         ),
@@ -922,9 +971,17 @@ class _RouteLine extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(pickup, maxLines: 2, overflow: TextOverflow.ellipsis, style: headingBlack(context).copyWith(fontSize: 13, height: 1.35)),
+              Text(pickup,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: headingBlack(context)
+                      .copyWith(fontSize: 13, height: 1.35)),
               const SizedBox(height: 18),
-              Text(drop, maxLines: 2, overflow: TextOverflow.ellipsis, style: headingBlack(context).copyWith(fontSize: 13, height: 1.35)),
+              Text(drop,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: headingBlack(context)
+                      .copyWith(fontSize: 13, height: 1.35)),
             ],
           ),
         ),
@@ -934,7 +991,11 @@ class _RouteLine extends StatelessWidget {
 }
 
 class _CardFooter extends StatelessWidget {
-  const _CardFooter({required this.leftIcon, required this.leftText, required this.rightIcon, required this.rightText});
+  const _CardFooter(
+      {required this.leftIcon,
+      required this.leftText,
+      required this.rightIcon,
+      required this.rightText});
 
   final IconData leftIcon;
   final String leftText;
@@ -953,10 +1014,15 @@ class _CardFooter extends StatelessWidget {
         children: [
           Icon(leftIcon, size: 17, color: Colors.black54),
           const SizedBox(width: 6),
-          Expanded(child: Text(leftText, style: regular(context).copyWith(fontSize: 12, color: Colors.black54))),
+          Expanded(
+              child: Text(leftText,
+                  style: regular(context)
+                      .copyWith(fontSize: 12, color: Colors.black54))),
           Icon(rightIcon, size: 17, color: Colors.black54),
           const SizedBox(width: 6),
-          Text(rightText, style: regular(context).copyWith(fontSize: 12, color: Colors.black54)),
+          Text(rightText,
+              style: regular(context)
+                  .copyWith(fontSize: 12, color: Colors.black54)),
           const SizedBox(width: 6),
           const Icon(Icons.chevron_right_rounded, color: Colors.black38),
         ],
@@ -981,7 +1047,8 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Text(
         text.isEmpty ? '-' : text,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900),
+        style:
+            TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900),
       ),
     );
   }
@@ -1018,7 +1085,8 @@ class _SmallLoadingCard extends StatelessWidget {
         highlightColor: Colors.white,
         child: Container(
           height: height,
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+          decoration: BoxDecoration(
+              color: Colors.white, borderRadius: BorderRadius.circular(24)),
         ),
       ),
     );
@@ -1036,23 +1104,30 @@ class _EmptyHistory extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(28, 80, 28, 28),
       child: Container(
         padding: const EdgeInsets.all(26),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
+        decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(28)),
         child: Column(
           children: [
             Container(
               height: 72,
               width: 72,
-              decoration: BoxDecoration(color: themeColor.withValues(alpha: .10), borderRadius: BorderRadius.circular(24)),
-              child: Icon(Icons.history_toggle_off_rounded, color: themeColor, size: 34),
+              decoration: BoxDecoration(
+                  color: themeColor.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(24)),
+              child: Icon(Icons.history_toggle_off_rounded,
+                  color: themeColor, size: 34),
             ),
             const SizedBox(height: 18),
-            Text('No history found'.translate(context), style: headingBlackBold(context).copyWith(fontSize: 18)),
+            Text('No history found'.translate(context),
+                style: headingBlackBold(context).copyWith(fontSize: 18)),
             const SizedBox(height: 8),
             Text(
-              'No ${status.toLowerCase()} records are available right now.'.translate(context),
+              'No ${status.toLowerCase()} records are available right now.'
+                  .translate(context),
               textAlign: TextAlign.center,
-              style: regular(context).copyWith(color: Colors.black54, height: 1.4),
-              ),
+              style:
+                  regular(context).copyWith(color: Colors.black54, height: 1.4),
+            ),
           ],
         ),
       ),
@@ -1087,11 +1162,15 @@ class _HistoryEntry {
 }
 
 DateTime _parseBookingDate(Bookings? booking) {
-  return DateTime.tryParse('${booking?.rideDate ?? booking?.createdAt ?? ''}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+  return DateTime.tryParse(
+          '${booking?.rideDate ?? booking?.createdAt ?? ''}') ??
+      DateTime.fromMillisecondsSinceEpoch(0);
 }
 
 DateTime _parseFoodDate(Map<String, dynamic>? order) {
-  return DateTime.tryParse('${order?['created_at'] ?? order?['placed_at'] ?? ''}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+  return DateTime.tryParse(
+          '${order?['created_at'] ?? order?['placed_at'] ?? ''}') ??
+      DateTime.fromMillisecondsSinceEpoch(0);
 }
 
 Map<String, dynamic>? _asMap(dynamic value) {
