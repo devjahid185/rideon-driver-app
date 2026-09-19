@@ -48,7 +48,9 @@ Future<dynamic> httpPost(path, data, {required BuildContext context}) async {
         responseData =
             json.decode(const Utf8Codec().decode(response.bodyBytes));
       } else {
-        return {"error": "Token regeneration failed"};
+        return responseData is Map
+            ? responseData
+            : {"error": "Request failed. Please try again."};
       }
     }
     return responseData;
@@ -151,7 +153,9 @@ Future<dynamic> httpGet(String path, Map<String, dynamic> data,
         responsegetData =
             json.decode(const Utf8Codec().decode(response.bodyBytes));
       } else {
-        return {"error": "Token regeneration failed"};
+        return responsegetData is Map
+            ? responsegetData
+            : {"error": "Request failed. Please try again."};
       }
     } else {
       responsegetData =
