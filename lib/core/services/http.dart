@@ -183,15 +183,24 @@ Future<String?> generateToken() async {
     };
     Map<String, dynamic> body = {
       "secret": Config.secretKey,
-      "user_token": token
+      "user_token": token,
     };
-    final response = await http.post(
+    var response = await http.post(
       Uri.parse(url),
       headers: headers,
       body: jsonEncode(body),
     );
 
-    final data = json.decode(response.body);
+    var data = json.decode(response.body);
+    if (response.statusCode == 419 && token.isNotEmpty) {
+      response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: jsonEncode({"secret": Config.secretKey}),
+      );
+      data = json.decode(response.body);
+    }
+
     if (response.statusCode == 200) {
       final token = data['data']["token"].toString();
       bearerToken = token;
