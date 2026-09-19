@@ -2,8 +2,10 @@ class Config {
   static const googleKey = "AIzaSyCm-rRAsfqyVZuth4dXJQ11cU24rV-5Zzw";
   static const String oneSiginalAppid = 'YOUR_ONESIGNAL_APP_ID_HERE';
   static const String oneSiginalApiKey = 'YOUR_ONESIGNAL_API_KEY_HERE';
-  static const String riderAppOneSiginalAppid ='YOUR_RIDER_APP_ONESIGNAL_APP_ID_HERE';
-  static const String riderAppOneSiginalApiKey ='YOUR_RIDER_APP_ONESIGNAL_API_KEY_HERE';
+  static const String riderAppOneSiginalAppid =
+      'YOUR_RIDER_APP_ONESIGNAL_APP_ID_HERE';
+  static const String riderAppOneSiginalApiKey =
+      'YOUR_RIDER_APP_ONESIGNAL_API_KEY_HERE';
 
   // Temporary base domain URL for setup (please add your final URL here)
   static const String baseDomain = 'https://admin.wgnmove.com';
@@ -25,9 +27,11 @@ class Config {
   static const String getAllCategories = 'getAllCategories';
   static const String fcmUpdate = 'fcmUpdate';
   static const String getMakes = 'getMakes';
-  static const String addEditVerificationDocuments = 'addEditVerificationDocuments';
+  static const String addEditVerificationDocuments =
+      'addEditVerificationDocuments';
   static const String getVendorWallet = 'getVendorWallet';
-  static const String getVendorWalletTransactions = 'getVendorWalletTransactions';
+  static const String getVendorWalletTransactions =
+      'getVendorWalletTransactions';
   static const String getPayoutTransactions = 'getPayoutTransactions';
   static const String getTotalPayoutAmount = 'getTotalPayoutAmount';
   static const String insertPayout = 'insertPayout';
@@ -54,6 +58,7 @@ class Config {
   static const String vendorbookingRecord = 'vendorbookingRecord';
   static const String updateBookingStatusByDriver =
       'updateBookingStatusByDriver';
+  static const String rideAudioRecording = 'ride-audio-recordings';
   static const String changeMobileNumber = 'changeMobileNumber';
   static const String updatePaymentStatusByDriver =
       'updatePaymentStatusByDriver';

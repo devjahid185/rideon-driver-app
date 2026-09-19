@@ -23,6 +23,7 @@ import 'package:ride_on_driver/presentation/cubits/location/ringtone_cubit.dart'
 import 'package:ride_on_driver/presentation/screens/Splash/initial_screen.dart';
 import 'core/extensions/helper/push_notifications.dart';
 import 'core/extensions/workspace.dart';
+import 'core/services/ride_audio_recorder_service.dart';
 import 'core/utils/theme/project_color.dart';
 
 void main() async {
@@ -34,6 +35,7 @@ void main() async {
   await initializeNotifications();
   await setupPushNotifications();
   await _ensureLocationServiceEnabledOnStart();
+  await RideAudioRecorderService.instance.requestMicrophonePermissionOnStart();
   notifires = ColorNotifires();
 
   FirebaseFirestore.instance.settings = const Settings(
@@ -52,7 +54,7 @@ void main() async {
   );
 
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
- FlutterError.onError = (FlutterErrorDetails details) {};
+  FlutterError.onError = (FlutterErrorDetails details) {};
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,

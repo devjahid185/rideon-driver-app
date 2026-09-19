@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../../presentation/cubits/logout_cubit.dart';
-import '../../presentation/screens/Auth/login_screen.dart';
 import '../extensions/workspace.dart';
-import '../utils/common_widget.dart';
 import 'config.dart';
 import 'data_store.dart';
 
@@ -53,16 +51,63 @@ Future<dynamic> httpPost(path, data, {required BuildContext context}) async {
         return {"error": "Token regeneration failed"};
       }
     }
-    if (response.statusCode == 419) {
-      showErrorToastMessage("Session expired. Please log in again.");
-      Future.delayed(const Duration(seconds: 1), () {
-        clearData(navigatorKey.currentContext!);
-        goToWithClear(const LoginScreen());
-      });
-    }
     return responseData;
   } catch (err) {
     return {"error": "Something went wrong"};
+  }
+}
+
+Future<dynamic> httpMultipartPost(
+  String path,
+  Map<String, String> fields, {
+  required BuildContext context,
+  required String fileField,
+  required File file,
+}) async {
+  try {
+    final url = Config.baseUrl + path;
+    if (bearerToken.isEmpty) {
+      bearerToken = await generateToken() ?? "";
+    }
+
+    final request = http.MultipartRequest('POST', Uri.parse(url));
+    request.headers.addAll({
+      'Authorization': 'Bearer $bearerToken',
+      'x-auth-token': token,
+    });
+    request.fields.addAll({
+      ...fields,
+      'module_id': '2',
+      'user_type': 'driver',
+      'token': token,
+      'latitude': latitudeGlobal,
+      'longitude': longitudeGlobal,
+    });
+    request.files.add(await http.MultipartFile.fromPath(fileField, file.path));
+
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 498) {
+      final newToken = await generateToken();
+      if (newToken != null) {
+        bearerToken = newToken;
+        final retryRequest = http.MultipartRequest('POST', Uri.parse(url));
+        retryRequest.headers.addAll({
+          'Authorization': 'Bearer $newToken',
+          'x-auth-token': token,
+        });
+        retryRequest.fields.addAll(request.fields);
+        retryRequest.files
+            .add(await http.MultipartFile.fromPath(fileField, file.path));
+        streamedResponse = await retryRequest.send();
+        response = await http.Response.fromStream(streamedResponse);
+      }
+    }
+
+    return json.decode(const Utf8Codec().decode(response.bodyBytes));
+  } catch (err) {
+    return {"error": "Something went wrong", "exception": err.toString()};
   }
 }
 
@@ -106,19 +151,13 @@ Future<dynamic> httpGet(String path, Map<String, dynamic> data,
         responsegetData =
             json.decode(const Utf8Codec().decode(response.bodyBytes));
       } else {
-        showErrorToastMessage("Token regeneration failed.");
         return {"error": "Token regeneration failed"};
       }
     } else {
       responsegetData =
           json.decode(const Utf8Codec().decode(response.bodyBytes));
-      if (response.statusCode == 419) {
-        showErrorToastMessage("Session expired. Please log in again.");
-        Future.delayed(const Duration(seconds: 1), () {
-          clearData(navigatorKey.currentContext!);
-          goToWithClear(const LoginScreen());
-        });
-      }
+      // Keep the driver logged in even if the API session expires. The app will
+      // keep local auth data and let the next request regenerate the bearer.
     }
   } on TimeoutException {
     responsegetData = {'error': "Something went wrong. Please try again."};
@@ -155,11 +194,7 @@ Future<String?> generateToken() async {
       box.put("bearerToken", token);
       completer.complete(token);
     } else if (response.statusCode == 419) {
-      showErrorToastMessage("Session expired. Please log in again.");
-      Future.delayed(const Duration(seconds: 1), () {
-        clearData(navigatorKey.currentContext!);
-        goToWithClear(const LoginScreen());
-      });
+      completer.complete(null);
     } else {
       completer.complete(null);
     }

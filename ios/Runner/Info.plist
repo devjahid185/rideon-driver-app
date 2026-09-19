@@ -81,7 +81,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>RideOn Driver needs access to your location to find nearby drivers and provide ride options while you're actively using the app.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>RideOn Driver needs access to your microphone to enable ringtone alerts when you receive a new ride request, ensuring you don't miss important notifications.</string>
+	<string>WGN Move Driver needs microphone access to record active rides for safety from ride start until ride completion.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>RideOn Driver requires access to your photo library to upload pictures of your ID or other documents for booking verification, or to add profile and property images.</string>
 

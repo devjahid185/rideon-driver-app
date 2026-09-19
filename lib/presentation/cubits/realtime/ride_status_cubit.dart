@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ride_on_driver/core/services/ride_audio_recorder_service.dart';
 
 import '../../../domain/entities/realtime_ride_request.dart';
 
@@ -98,7 +99,9 @@ abstract class UpdateRideStatusInDatabaseState extends Equatable {
 }
 
 class RideStatusInitial extends UpdateRideStatusInDatabaseState {}
+
 class UpdatedRideStatusLoading extends UpdateRideStatusInDatabaseState {}
+
 class RideStatusSuceessUpdated extends UpdateRideStatusInDatabaseState {
   final String? status;
   RideStatusSuceessUpdated({this.status});
@@ -114,6 +117,7 @@ class CompleteRideStatusSuceessUpdated extends UpdateRideStatusInDatabaseState {
   @override
   List<Object?> get props => [status];
 }
+
 class CompleteRideStatusError extends UpdateRideStatusInDatabaseState {
   final String? error;
   CompleteRideStatusError({this.error});
@@ -136,11 +140,17 @@ class UpdateRideStatusInDatabaseCubit
       var response = await realtimeRepository.updateRideStatus(
           context: context, bookingId: bookingId, rideStatus: rideStatus);
       if (response["status"] == 200) {
+        if (rideStatus.toLowerCase() == 'ongoing') {
+          await RideAudioRecorderService.instance.start(
+            bookingId: bookingId,
+            // ignore: use_build_context_synchronously
+            context: context,
+          );
+        }
         emit(RideStatusSuceessUpdated(status: "com"));
-
       }
     } catch (err) {
-     //
+      //
     }
   }
 
@@ -150,10 +160,8 @@ class UpdateRideStatusInDatabaseCubit
       required String rideStatus,
       required String json,
       required String totalTime,
-      required String dropOtp
-      }) async {
+      required String dropOtp}) async {
     try {
-
       emit(UpdatedRideStatusLoading());
       var response = await realtimeRepository.updateCompleteRideWithDataStatus(
           context: context,
@@ -161,20 +169,21 @@ class UpdateRideStatusInDatabaseCubit
           rideStatus: rideStatus,
           fireBaseJson: json,
           totalTime: totalTime,
-        dropOtp: dropOtp
-
-      );
+          dropOtp: dropOtp);
       if (response["status"] == 200) {
+        if (rideStatus.toLowerCase() == 'completed') {
+          await RideAudioRecorderService.instance.stopAndUpload(
+            bookingId: bookingId,
+            // ignore: use_build_context_synchronously
+            context: context,
+          );
+        }
         emit(CompleteRideStatusSuceessUpdated(status: "com"));
-
-
-      }
-      else{
+      } else {
         emit(CompleteRideStatusError(error: response["error"].toString()));
-
       }
     } catch (err) {
-  //
+      //
     }
   }
 
@@ -182,8 +191,6 @@ class UpdateRideStatusInDatabaseCubit
     emit(RideStatusInitial());
   }
 }
-
-
 
 abstract class GetRideDataState extends Equatable {
   @override
@@ -201,6 +208,7 @@ class GetRideDataSuccess extends GetRideDataState {
   @override
   List<Object?> get props => [requestDataModel];
 }
+
 class GetRideDataSuccessForInitial extends GetRideDataState {
   final RealTimeRideRequest? requestDataModel;
   GetRideDataSuccessForInitial(this.requestDataModel);
@@ -216,6 +224,7 @@ class UpdatedGetRideDataSuccess extends GetRideDataState {
   @override
   List<Object?> get props => [requestDataModel];
 }
+
 class UpdatedGetRideDataDropSuccess extends GetRideDataState {
   final RealTimeRideRequest? requestDataModel;
   UpdatedGetRideDataDropSuccess(this.requestDataModel);
@@ -223,7 +232,6 @@ class UpdatedGetRideDataDropSuccess extends GetRideDataState {
   @override
   List<Object?> get props => [requestDataModel];
 }
-
 
 class GetRideDataFailed extends GetRideDataState {
   final String error;
@@ -248,16 +256,14 @@ class GetRideDataCubit extends Cubit<GetRideDataState> {
         final dataMap = Map<String, dynamic>.from(snapshot.value as Map);
         final data = RealTimeRideRequest.fromMap(dataMap);
         emit(GetRideDataSuccess(data));
-
       } else {
-
         emit(GetRideDataFailed("No ride found with ID: $rideId"));
       }
     } catch (e) {
       emit(GetRideDataFailed("Error fetching ride: $e"));
-
     }
   }
+
   Future<void> fetchRideDataForInitial(String rideId) async {
     emit(GetRideDataLoading()); // Uncomment to show loading state
 
@@ -270,14 +276,11 @@ class GetRideDataCubit extends Cubit<GetRideDataState> {
         final dataMap = Map<String, dynamic>.from(snapshot.value as Map);
         final data = RealTimeRideRequest.fromMap(dataMap);
         emit(GetRideDataSuccessForInitial(data));
-
       } else {
-
         emit(GetRideDataFailed("No ride found with ID: $rideId"));
       }
     } catch (e) {
       emit(GetRideDataFailed("Error fetching ride: $e"));
-
     }
   }
 
@@ -297,7 +300,8 @@ class GetRideDataCubit extends Cubit<GetRideDataState> {
       emit(GetRideDataFailed("Error fetching ride: $e"));
     }
   }
- Future<void> fetchUpdatedRideDataForDrop(String rideId) async {
+
+  Future<void> fetchUpdatedRideDataForDrop(String rideId) async {
     try {
       final ref =
           FirebaseDatabase.instance.ref().child("ride_requests").child(rideId);
@@ -313,9 +317,8 @@ class GetRideDataCubit extends Cubit<GetRideDataState> {
       emit(GetRideDataFailed("Error fetching ride: $e"));
     }
   }
+
   void clear() {
     emit(GetRideDataInitial());
   }
 }
-
- 
