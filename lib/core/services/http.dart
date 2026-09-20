@@ -11,6 +11,29 @@ bool connectionLost = false;
 String latitudeGlobal = '';
 String longitudeGlobal = '';
 bool shouldLogout = false;
+
+String _bodyPreview(String body, {int limit = 700}) {
+  return body.length > limit ? body.substring(0, limit) : body;
+}
+
+void _logHttpFailure(
+  String method,
+  String url,
+  int statusCode,
+  String body, {
+  Object? exception,
+}) {
+  debugPrint(
+    "[HTTP][$method][FAIL] url=$url | code=$statusCode | hasUserToken=${token.isNotEmpty} | userTokenLength=${token.length} | hasBearer=${bearerToken.isNotEmpty}",
+  );
+  if (body.isNotEmpty) {
+    debugPrint("[HTTP][$method][FAIL] body=${_bodyPreview(body)}");
+  }
+  if (exception != null) {
+    debugPrint("[HTTP][$method][FAIL] exception=$exception");
+  }
+}
+
 Future<dynamic> httpPost(path, data, {required BuildContext context}) async {
   try {
     String apiBaseUrl = Config.baseUrl;
@@ -33,8 +56,18 @@ Future<dynamic> httpPost(path, data, {required BuildContext context}) async {
       headers: headers,
       body: jsonEncode(data),
     );
-    var responseData =
-        json.decode(const Utf8Codec().decode(response.bodyBytes));
+    var rawBody = const Utf8Codec().decode(response.bodyBytes);
+    var responseData = json.decode(rawBody);
+    if (response.statusCode >= 400 ||
+        (responseData is Map &&
+            (responseData["status"] == 419 ||
+                responseData["ResponseCode"] == 419 ||
+                responseData["message"]
+                    .toString()
+                    .toLowerCase()
+                    .contains("token")))) {
+      _logHttpFailure("POST", url, response.statusCode, rawBody);
+    }
     if (response.statusCode == 498) {
       final newToken = await generateToken();
       if (newToken != null) {
@@ -45,8 +78,8 @@ Future<dynamic> httpPost(path, data, {required BuildContext context}) async {
           headers: headers,
           body: jsonEncode(data),
         );
-        responseData =
-            json.decode(const Utf8Codec().decode(response.bodyBytes));
+        rawBody = const Utf8Codec().decode(response.bodyBytes);
+        responseData = json.decode(rawBody);
       } else {
         return responseData is Map
             ? responseData
@@ -55,7 +88,9 @@ Future<dynamic> httpPost(path, data, {required BuildContext context}) async {
     }
     return responseData;
   } catch (err) {
-    return {"error": "Something went wrong"};
+    _logHttpFailure("POST", Config.baseUrl + path.toString(), 0, "",
+        exception: err);
+    return {"error": "Something went wrong", "exception": err.toString()};
   }
 }
 
@@ -107,8 +142,14 @@ Future<dynamic> httpMultipartPost(
       }
     }
 
-    return json.decode(const Utf8Codec().decode(response.bodyBytes));
+    final rawBody = const Utf8Codec().decode(response.bodyBytes);
+    if (response.statusCode >= 400 || rawBody.toLowerCase().contains("token")) {
+      _logHttpFailure("MULTIPART", url, response.statusCode, rawBody);
+    }
+
+    return json.decode(rawBody);
   } catch (err) {
+    _logHttpFailure("MULTIPART", Config.baseUrl + path, 0, "", exception: err);
     return {"error": "Something went wrong", "exception": err.toString()};
   }
 }
@@ -141,9 +182,9 @@ Future<dynamic> httpGet(String path, Map<String, dynamic> data,
     var response = await http
         .get(Uri.parse(fullUrl), headers: headers)
         .timeout(const Duration(seconds: 15)); // Timeout after 15 seconds
+    final rawBody = const Utf8Codec().decode(response.bodyBytes);
     if (response.statusCode == 200) {
-      responsegetData =
-          json.decode(const Utf8Codec().decode(response.bodyBytes));
+      responsegetData = json.decode(rawBody);
     } else if (response.statusCode == 498) {
       final newToken = await generateToken();
       if (newToken != null) {
@@ -158,12 +199,16 @@ Future<dynamic> httpGet(String path, Map<String, dynamic> data,
             : {"error": "Request failed. Please try again."};
       }
     } else {
-      responsegetData =
-          json.decode(const Utf8Codec().decode(response.bodyBytes));
+      responsegetData = json.decode(rawBody);
+      _logHttpFailure("GET", fullUrl, response.statusCode, rawBody);
       // Keep the driver logged in even if the API session expires. The app will
       // keep local auth data and let the next request regenerate the bearer.
     }
   } on TimeoutException {
+    _logHttpFailure("GET", Config.baseUrl + path, 0, "", exception: "timeout");
+    responsegetData = {'error': "Something went wrong. Please try again."};
+  } catch (e) {
+    _logHttpFailure("GET", Config.baseUrl + path, 0, "", exception: e);
     responsegetData = {'error': "Something went wrong. Please try again."};
   }
   return responsegetData;
@@ -192,6 +237,9 @@ Future<String?> generateToken() async {
     );
 
     var data = json.decode(response.body);
+    if (response.statusCode >= 400) {
+      _logHttpFailure("TOKEN", url, response.statusCode, response.body);
+    }
     if (response.statusCode == 419 && token.isNotEmpty) {
       response = await http.post(
         Uri.parse(url),
@@ -212,6 +260,9 @@ Future<String?> generateToken() async {
       completer.complete(null);
     }
   } catch (e) {
+    _logHttpFailure(
+        "TOKEN", Config.baseUrlForBearer + Config.generateToken, 0, "",
+        exception: e);
     completer.complete(null);
   } finally {
     _tokenFuture = null;
